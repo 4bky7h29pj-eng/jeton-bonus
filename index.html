@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="az">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Jeton Bonus Sistemi</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#0b0b10;color:#fff}
+.wrap{max-width:900px;margin:auto;padding:22px}.card{background:#15151d;border:1px solid #292936;border-radius:18px;padding:20px;margin-bottom:18px;box-shadow:0 10px 30px #0005}
+h1{margin:0 0 6px;font-size:28px}.muted{color:#aaa}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:650px){.grid{grid-template-columns:1fr}}
+label{display:block;color:#bbb;font-size:13px;margin-bottom:6px}input{width:100%;padding:13px;border-radius:10px;border:1px solid #363644;background:#0e0e14;color:#fff;font-size:16px}
+button{border:0;border-radius:10px;padding:13px 17px;font-weight:700;cursor:pointer;margin-top:12px}
+.primary{background:#fff;color:#000}.danger{background:#4b1d25;color:#fff}.row{display:flex;gap:8px;flex-wrap:wrap}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.stat{background:#0e0e14;border-radius:12px;padding:15px}.num{font-size:24px;font-weight:800;margin-top:5px}
+table{width:100%;border-collapse:collapse;margin-top:10px}th,td{text-align:left;padding:10px;border-bottom:1px solid #292936;font-size:14px}
+.badge{display:inline-block;background:#263b28;padding:5px 9px;border-radius:999px;color:#9cff9c;font-weight:700}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="card">
+<h1>🪙 JETON BONUS</h1><div class="muted">Müştəri alışlarını qeyd et, bonus avtomatik hesablansın.</div>
+</div>
+
+<div class="card">
+<h2>Bonus qaydaları</h2>
+<div class="grid">
+<div><label>Hər 2.000 jetona bonus</label><input id="b2000" type="number" value="100"></div>
+<div><label>Hər 4.000 jetona bonus</label><input id="b4000" type="number" value="100"></div>
+<div><label>Hər 5.000 jetona bonus</label><input id="b5000" type="number" value="200"></div>
+<div><label>Hər 8.000 jetona bonus</label><input id="b8000" type="number" value="300"></div>
+</div>
+<p class="muted">Sistem ən böyük uyğun qaydanı seçir. Məsələn 8.000 → 300 bonus.</p>
+<button class="primary" onclick="saveRules()">Qaydaları yadda saxla</button>
+</div>
+
+<div class="card">
+<h2>Yeni alış</h2>
+<div class="grid">
+<div><label>Müştəri adı</label><input id="name" placeholder="Məsələn: Ruslan"></div>
+<div><label>Alınan jeton</label><input id="coins" type="number" placeholder="8000"></div>
+</div>
+<button class="primary" onclick="addPurchase()">➕ Alışı əlavə et</button>
+<div id="msg" class="muted" style="margin-top:10px"></div>
+</div>
+
+<div class="card">
+<h2>Müştərilər</h2>
+<input id="search" placeholder="🔎 Müştəri axtar..." oninput="render()">
+<div id="customers"></div>
+</div>
+
+<div class="card">
+<h2>Alış tarixçəsi</h2>
+<div id="history"></div>
+<button class="danger" onclick="clearAll()">Bütün məlumatları sil</button>
+</div>
+</div>
+
+<script>
+const KEY="jetonBonusData";
+const RULE="jetonBonusRules";
+let data=JSON.parse(localStorage.getItem(KEY)||"[]");
+let rules=JSON.parse(localStorage.getItem(RULE)||'{"2000":100,"4000":100,"5000":200,"8000":300}');
+
+function loadRules(){
+for(const k of [2000,4000,5000,8000]) document.getElementById("b"+k).value=rules[k]??0;
+}
+function saveRules(){
+rules={2000:+b2000.value||0,4000:+b4000.value||0,5000:+b5000.value||0,8000:+b8000.value||0};
+localStorage.setItem(RULE,JSON.stringify(rules)); msg.textContent="✅ Bonus qaydaları yadda saxlanıldı."; render();
+}
+function bonusFor(c){
+let keys=Object.keys(rules).map(Number).filter(k=>c>=k).sort((a,b)=>b-a);
+return keys.length?rules[keys[0]]:0;
+}
+function addPurchase(){
+let n=name.value.trim(), c=Number(coins.value);
+if(!n||!c||c<1){msg.textContent="⚠️ Adı və jeton miqdarını düzgün daxil et.";return}
+let b=bonusFor(c);
+data.unshift({id:Date.now(),name:n,coins:c,bonus:b,date:new Date().toLocaleString("az-AZ")});
+localStorage.setItem(KEY,JSON.stringify(data)); name.value="";coins.value="";
+msg.textContent=`✅ ${n}: ${c.toLocaleString()} jeton → +${b} bonus`;
+render();
+}
+function render(){
+let q=search.value.trim().toLowerCase();
+let filtered=data.filter(x=>x.name.toLowerCase().includes(q));
+let map={};
+filtered.forEach(x=>{let k=x.name.toLowerCase();if(!map[k])map[k]={name:x.name,coins:0,bonus:0,count:0};map[k].coins+=x.coins;map[k].bonus+=x.bonus;map[k].count++});
+let arr=Object.values(map);
+customers.innerHTML=arr.length?`<div class="stats">${arr.map(x=>`<div class="stat"><div>${esc(x.name)}</div><div class="num">${x.coins.toLocaleString()}</div><div class="muted">jeton · ${x.count} alış</div><div class="badge">🎁 ${x.bonus} bonus</div></div>`).join("")}</div>`:"<p class='muted'>Hələ müştəri yoxdur.</p>";
+history.innerHTML=filtered.length?`<table><tr><th>Müştəri</th><th>Jeton</th><th>Bonus</th><th>Tarix</th></tr>${filtered.map(x=>`<tr><td>${esc(x.name)}</td><td>${x.coins.toLocaleString()}</td><td><span class="badge">+${x.bonus}</span></td><td>${x.date}</td></tr>`).join("")}</table>`:"<p class='muted'>Tarixçə boşdur.</p>";
+}
+function clearAll(){if(confirm("Bütün məlumatlar silinsin?")){data=[];localStorage.removeItem(KEY);render();}}
+function esc(s){return s.replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));}
+loadRules();render();
+</script>
+</body></html>
